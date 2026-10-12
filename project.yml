@@ -11,6 +11,8 @@ settings:
     MARKETING_VERSION: "0.1"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_STRICT_CONCURRENCY: minimal
+    # The Homebrew codec libraries are built for Apple silicon only.
+    ARCHS: arm64
 targets:
   FastRouteCompanion:
     type: application
