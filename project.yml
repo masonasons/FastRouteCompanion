@@ -1,0 +1,105 @@
+name: FastRouteCompanion
+options:
+  bundleIdPrefix: me.masonasons
+  deploymentTarget:
+    macOS: "14.2"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_STRICT_CONCURRENCY: minimal
+targets:
+  FastRouteCompanion:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+      - path: Resources
+        excludes:
+          - "Info.plist"
+          - "*.entitlements"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.masonasons.FastRouteCompanion
+        PRODUCT_NAME: FastRouteCompanion
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/FastRouteCompanion.entitlements
+        SWIFT_OBJC_BRIDGING_HEADER: Sources/Support/Codecs-Bridging-Header.h
+        HEADER_SEARCH_PATHS:
+          - "$(inherited)"
+          - "/opt/homebrew/include"
+        LIBRARY_SEARCH_PATHS:
+          - "$(inherited)"
+          - "/opt/homebrew/lib"
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-lopus"
+          - "-lFLAC"
+          - "-Wl,-headerpad_max_install_names"
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/../Frameworks"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "Apple Development"
+        DEVELOPMENT_TEAM: 9QBYDAX396
+        ENABLE_HARDENED_RUNTIME: NO
+        ENABLE_APP_SANDBOX: NO
+        COMBINE_HIDPI_IMAGES: YES
+    dependencies:
+      - sdk: AVFoundation.framework
+      - sdk: CoreAudio.framework
+      - sdk: AudioToolbox.framework
+    postBuildScripts:
+      - name: Bundle codec libraries
+        path: Scripts/bundle-libs.sh
+        basedOnDependencyAnalysis: false
+  FastRouteCompanionTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+      - path: Sources/Core
+      - path: Sources/Support
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.masonasons.FastRouteCompanionTests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_OBJC_BRIDGING_HEADER: Sources/Support/Codecs-Bridging-Header.h
+        HEADER_SEARCH_PATHS:
+          - "$(inherited)"
+          - "/opt/homebrew/include"
+        LIBRARY_SEARCH_PATHS:
+          - "$(inherited)"
+          - "/opt/homebrew/lib"
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-lopus"
+          - "-lFLAC"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+    dependencies:
+      - sdk: AVFoundation.framework
+      - sdk: CoreAudio.framework
+      - sdk: AudioToolbox.framework
+      - sdk: AppKit.framework
+schemes:
+  FastRouteCompanion:
+    build:
+      targets:
+        FastRouteCompanion: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  FastRouteCompanionTests:
+    build:
+      targets:
+        FastRouteCompanionTests: all
+    test:
+      targets:
+        - FastRouteCompanionTests

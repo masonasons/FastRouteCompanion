@@ -1,0 +1,105 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # XcodeGen writes the project; opus and flac are linked and copied into
+      # the app by Scripts/bundle-libs.sh.
+      - name: Install dependencies
+        run: brew install xcodegen opus flac
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: Run the tests
+        run: |
+          xcodebuild test -scheme FastRouteCompanionTests -derivedDataPath build \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= -quiet
+
+      # Ad-hoc signed (no Developer ID on the runner): the project's own signing
+      # settings are overridden on the command line.
+      - name: Build FastRouteCompanion.app
+        run: |
+          xcodebuild -scheme FastRouteCompanion -configuration Release -derivedDataPath build build \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= -quiet
+
+      # Any bundled libraries first, then the app.
+      - name: Sign and zip
+        run: |
+          APP=build/Build/Products/Release/FastRouteCompanion.app
+          for lib in "$APP"/Contents/Frameworks/*.dylib; do
+            [ -e "$lib" ] && codesign --force --sign - "$lib"
+          done
+          codesign --force --sign - "$APP"
+          codesign --verify --verbose "$APP"
+          ditto -c -k --keepParent "$APP" FastRouteCompanion-macOS.zip
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: FastRouteCompanion-macOS.zip
+
+  release:
+    needs: [build-macos]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download macOS app
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-app
+          path: artifacts/
+
+      - name: Delete existing latest release
+        run: gh release delete latest --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          body: |
+            Automated build from commit ${{ github.sha }}
+
+            **Built:** ${{ github.event.head_commit.timestamp }}
+            **Commit:** ${{ github.event.head_commit.message }}
+
+            This release is automatically updated on every commit to main.
+
+            ## Download
+            - **macOS:** FastRouteCompanion-macOS.zip (macOS 14.2 or later, Apple silicon)
+
+            ## Installation
+            1. Download and unzip FastRouteCompanion-macOS.zip
+            2. Move FastRouteCompanion.app to Applications
+            3. The app is not notarized, so macOS blocks it at first. In Terminal, run:
+               `xattr -cr /Applications/FastRouteCompanion.app`
+            4. Open FastRoute Companion. It asks for microphone access the first time a
+               Net Send block captures an input device, and for system audio recording the
+               first time one captures system audio or an application.
+          files: artifacts/*
+          prerelease: true
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
